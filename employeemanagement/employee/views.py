@@ -10,8 +10,6 @@ from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken, OutstandingToken, BlacklistedToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from datetime import datetime
-from rest_framework.exceptions import PermissionDenied
-# from utils import get_user
 
 
 class ListCreateEmployeeAPIView(APIView):
@@ -40,7 +38,7 @@ class ListCreateEmployeeAPIView(APIView):
     def get(self, request):
         page_number = request.GET.get('page', 1)
         page_size = request.GET.get('page', 20)
-        employee_obj = Employee.objects.exclude(is_superuser=True)  # Exclude superusers
+        employee_obj = Employee.objects.exclude(is_superuser=True)
         paginator = Paginator(employee_obj, int(page_size))
 
         try:
@@ -87,8 +85,7 @@ class GetUpdateDeleteEmployeeDetails(APIView):
 
     def patch(self, request, pk):
         employee = get_object_or_404(Employee.objects.exclude(is_superuser=True), pk=pk)
-        serializer = EmployeeSerializer(employee, data=request.data,
-                                        partial=True)  # Use request.data to get the new data
+        serializer = EmployeeSerializer(employee, data=request.data,partial=True)
 
         if serializer.is_valid():
             serializer.save()
@@ -146,7 +143,7 @@ class LogoutView(APIView):
         try:
             token = request.auth
             outstanding_token = OutstandingToken.objects.get(token=token)
-            BlacklistedToken.objects.create(token=outstanding_token)
+            blacklisted_token = BlacklistedToken.objects.create(token=outstanding_token)
             return Response({"detail": "Successfully logged out."}, status=205)
         except OutstandingToken.DoesNotExist:
             return Response({"detail": "Token is invalid or has already been blacklisted."}, status=400)
@@ -205,7 +202,7 @@ class CreateVacationRequest(APIView):
             employee=employee,
             start_date=start_date,
             end_date=end_date,
-            attached_file=request.FILES.get('attached_file', None)  # handle file attachment
+            attached_file=request.FILES.get('attached_file', None)
         )
 
         return Response({"message": "Leave requested successfully.", "leave_id": leave.id},

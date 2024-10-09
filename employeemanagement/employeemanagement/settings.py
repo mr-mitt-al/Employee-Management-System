@@ -142,4 +142,6 @@ SIMPLE_JWT = {
     'AUTH_HEADER_TYPES': ('Bearer',),
     'AUTH_TOKEN_TYPES': ('access', 'refresh'),
     'TOKEN_BLACKLIST_ENABLED': True,
+    'ROTATE_REFRESH_TOKENS': True,
+    'OUTSTANDING_TOKEN_MANAGER_ENABLED': True,
 }
