@@ -9,9 +9,9 @@ class EmployeeSerializer(serializers.ModelSerializer):
     class Meta:
         model = Employee
         fields = [
-            'id', 'first_name', 'last_name', 'email', 'age', 'phone_number', 'position',
-            'description', 'hiring_date', 'profile_picture']
-        read_only_fields = ['id', 'hiring_date']
+            'id', 'first_name', 'last_name',  'age', 'phone_number', 'position',
+            'description', 'hiring_date', 'profile_picture', 'email']
+        read_only_fields = ['id', 'hiring_date',]
 
     def create(self, validated_data):
         """
@@ -40,7 +40,7 @@ class EmployeeSerializer(serializers.ModelSerializer):
         """
         instance.first_name = validated_data.get('first_name', instance.first_name)
         instance.last_name = validated_data.get('last_name', instance.last_name)
-        instance.email = validated_data.get('email', instance.email)
+        # instance.email = validated_data.get('email', instance.email)
         instance.age = validated_data.get('age', instance.age)
         instance.phone_number = validated_data.get('phone_number', instance.phone_number)
         instance.position = validated_data.get('position', instance.position)
@@ -76,6 +76,10 @@ class ChangePasswordSerializer(serializers.Serializer):
 
 
 class RequestLeaveSerializer(serializers.ModelSerializer):
+    employee_name = serializers.SerializerMethodField()
     class Meta:
         model = RequestLeave
-        fields = ['employee', 'reason', 'start_date', 'end_date', 'leave_status', 'leave_requested_at']
+        fields = ['id', 'employee', 'employee_name', 'reason', 'start_date', 'end_date', 'leave_status', 'leave_requested_at']
+
+    def get_employee_name(self, obj):
+        return f"{obj.employee.first_name} {obj.employee.last_name}"

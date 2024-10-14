@@ -10,6 +10,7 @@ from django.contrib.auth import authenticate
 from rest_framework_simplejwt.tokens import RefreshToken, OutstandingToken, BlacklistedToken
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from datetime import datetime
+from django.utils import timezone
 
 
 class ListCreateEmployeeAPIView(APIView):
@@ -36,33 +37,11 @@ class ListCreateEmployeeAPIView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
     def get(self, request):
-        page_number = request.GET.get('page', 1)
-        page_size = request.GET.get('page', 20)
+        # Remove pagination and return all employees directly
         employee_obj = Employee.objects.exclude(is_superuser=True)
-        paginator = Paginator(employee_obj, int(page_size))
+        serializer = EmployeeSerializer(employee_obj, many=True)
 
-        try:
-            employee_page = paginator.page(page_number)
-        except PageNotAnInteger:
-            employee_page = paginator.page(1)
-        except EmptyPage:
-            employee_page = paginator.page(paginator.num_pages)
-
-        serializer = EmployeeSerializer(employee_page, many=True)
-
-        final_response_data = {
-            "page_details": {
-                "current_page": employee_page.number,
-                "entries_in_this_page": len(serializer.data),
-                "total_pages": paginator.num_pages,
-                "has_previous_page": employee_page.has_previous(),
-                "has_next_page": employee_page.has_next(),
-                "total_employees": paginator.count
-            },
-            "employee_information": serializer.data
-        }
-
-        return Response(final_response_data, status=200)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 
 class GetUpdateDeleteEmployeeDetails(APIView):
@@ -85,7 +64,7 @@ class GetUpdateDeleteEmployeeDetails(APIView):
 
     def patch(self, request, pk):
         employee = get_object_or_404(Employee.objects.exclude(is_superuser=True), pk=pk)
-        serializer = EmployeeSerializer(employee, data=request.data,partial=True)
+        serializer = EmployeeSerializer(employee, data=request.data, partial=True)
 
         if serializer.is_valid():
             serializer.save()
@@ -109,6 +88,7 @@ class ChangePassword(APIView):
             return Response({"message": "Password changed successfully."}, status=status.HTTP_200_OK)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 class LoginView(APIView):
     def post(self, request):
@@ -155,13 +135,11 @@ class CreateVacationRequest(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAuthenticated]
 
-    def post(self, request, employee_id):
-        try:
-            employee = Employee.objects.get(id=employee_id)
-        except Employee.DoesNotExist:
-            return Response({"error": "Employee not found."}, status=status.HTTP_404_NOT_FOUND)
+    def post(self, request):
+        # Get the authenticated employee from the request
+        employee = request.user
 
-        # Counting the total approved leaves the employee has taken
+        # Count the total approved leaves the employee has taken
         leaves_count = RequestLeave.objects.filter(employee=employee).count()
 
         if leaves_count >= 4:
@@ -174,10 +152,10 @@ class CreateVacationRequest(APIView):
         if not start_date or not end_date:
             return Response({"error": "Start and end dates are required."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Convert start and end dates to datetime objects
+        # Convert start and end dates to timezone-aware datetime objects
         try:
-            start_date_obj = datetime.strptime(start_date, '%Y-%m-%d')
-            end_date_obj = datetime.strptime(end_date, '%Y-%m-%d')
+            start_date_obj = timezone.make_aware(datetime.strptime(start_date, '%Y-%m-%d'))
+            end_date_obj = timezone.make_aware(datetime.strptime(end_date, '%Y-%m-%d'))
         except ValueError:
             return Response({"error": "Invalid date format. Use YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -198,15 +176,17 @@ class CreateVacationRequest(APIView):
             return Response({"error": "You already have a leave request during this period."},
                             status=status.HTTP_400_BAD_REQUEST)
 
+        # Create the leave request
         leave = RequestLeave.objects.create(
             employee=employee,
-            start_date=start_date,
-            end_date=end_date,
+            start_date=start_date_obj,  # Save the timezone-aware datetime
+            end_date=end_date_obj,      # Save the timezone-aware datetime
             attached_file=request.FILES.get('attached_file', None)
         )
 
         return Response({"message": "Leave requested successfully.", "leave_id": leave.id},
                         status=status.HTTP_201_CREATED)
+
 
 
 class UpdateVacationRequest(APIView):
@@ -232,7 +212,21 @@ class UpdateVacationRequest(APIView):
 class GetAllVacationRequests(APIView):
     authentication_classes = [JWTAuthentication]
     permission_classes = [IsAdminUser]
+
     def get(self, request):
         leave_requests = RequestLeave.objects.all()
         serializer = RequestLeaveSerializer(leave_requests, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+
+class EmployeeVacationRequests(APIView):
+    """
+    API View to list all vacation requests made by the logged-in employee.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        employee = request.user
+        vacation_requests = RequestLeave.objects.filter(employee=employee)
+        serializer = RequestLeaveSerializer(vacation_requests, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)

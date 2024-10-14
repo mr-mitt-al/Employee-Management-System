@@ -40,8 +40,8 @@ class RequestLeave(models.Model):
     # Choices for leaves that admin would have and by default it is in pending state
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="user_leaves")
     reason = models.TextField(blank=True, null=True)
-    start_date = models.DateTimeField()
-    end_date = models.DateTimeField()
+    start_date = models.DateField()
+    end_date = models.DateField()
     leave_requested_at = models.DateTimeField(default=timezone.now)
     leave_status = models.CharField(max_length=8, choices=LEAVE_CHOICES, default="pending")
     attached_file = models.FileField(null=True, blank=True, upload_to='attached_files/')
